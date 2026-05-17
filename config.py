@@ -64,6 +64,8 @@ class Settings:
     agentphone_agent_id: str | None = os.getenv("AGENTPHONE_AGENT_ID")
     agentphone_webhook_secret: str | None = os.getenv("AGENTPHONE_WEBHOOK_SECRET")
     agentphone_base_url: str = os.getenv("AGENTPHONE_BASE_URL", "https://api.agentphone.ai")
+    agentphone_voice: str | None = os.getenv("AGENTPHONE_VOICE")
+    agentphone_from_number_id: str | None = os.getenv("AGENTPHONE_FROM_NUMBER_ID")
     passenger_phone_number: str | None = os.getenv("PASSENGER_PHONE_NUMBER")
     passenger_name: str = os.getenv("PASSENGER_NAME", "passenger")
 

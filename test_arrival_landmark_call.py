@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--landmark", default=settings.landmark_label or "the nearby landmark")
     parser.add_argument("--passenger-name", default=settings.passenger_name)
     parser.add_argument("--use-demo-frame", action="store_true", help="Use generated demo frame instead of CARLA")
+    parser.add_argument("--require-gemini", action="store_true", help="Fail if GOOGLE_API_KEY is missing or Gemini falls back")
     parser.add_argument("--log-level", default="INFO", choices=("DEBUG", "INFO", "WARNING", "ERROR"))
     return parser.parse_args()
 
@@ -40,9 +41,14 @@ async def main() -> None:
         passenger_phone_number=args.to_number or settings.passenger_phone_number,
     )
 
+    if args.require_gemini and active_settings.missing_for_gemini():
+        raise RuntimeError("--require-gemini was set, but GOOGLE_API_KEY is missing")
+
     frame = await _capture_one_frame(active_settings)
     vision = GeminiLiveVision(active_settings)
     vision_event = await vision.analyze_frame(frame)
+    if args.require_gemini and vision_event.raw.get("source") == "scripted":
+        raise RuntimeError(f"--require-gemini was set, but Gemini used scripted fallback: {vision_event.reason}")
     logger.info("Gemini event=%s confidence=%.2f reason=%s", vision_event.event_type.value, vision_event.confidence, vision_event.reason)
 
     visual_context = vision_event.reason
@@ -71,7 +77,8 @@ async def main() -> None:
         to_number=request.to_number,
     )
 
-    logger.info("Calling %s with script: %s", request.to_number or "<missing number>", request.script)
+    logger.info("Calling %s with greeting: %s", request.to_number or "<missing number>", request.script)
+    logger.info("AgentPhone system prompt: %s", request.system_prompt)
     result = await AgentPhoneCaller(active_settings).call(request)
     logger.info("Call result attempted=%s call_id=%s message=%s", result.attempted, result.call_id, result.message)
 

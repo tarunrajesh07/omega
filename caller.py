@@ -39,6 +39,10 @@ class AgentPhoneCaller:
                 "context": request.context,
             },
         }
+        if self.settings.agentphone_voice:
+            payload["voice"] = self.settings.agentphone_voice
+        if self.settings.agentphone_from_number_id:
+            payload["fromNumberId"] = self.settings.agentphone_from_number_id
         headers = {
             "Authorization": f"Bearer {self.settings.agentphone_api_key}",
             "Content-Type": "application/json",
@@ -65,7 +69,13 @@ class AgentPhoneCaller:
 
 def build_system_prompt(request: CallRequest) -> str:
     return (
-        f"You are the voice assistant for an autonomous vehicle. The passenger is {request.passenger_name}. "
-        f"You are calling about this event: {request.context}. Start with: {request.script} "
-        "Answer questions briefly and clearly. If the passenger asks for an action, confirm it in one sentence."
+        "You are Omega, the voice assistant for an autonomous vehicle ride. "
+        f"You are speaking with {request.passenger_name}. "
+        f"Current ride event and visual context: {request.context} "
+        f"Your opening line has already been provided as the call's initial greeting: {request.script} "
+        "After the greeting, continue naturally as a concise ride assistant. "
+        "If the passenger asks where the vehicle is, restate the destination, nearby landmark, and any visual details from the context. "
+        "If they ask what to do next, tell them to look for the vehicle at the described pickup spot and confirm you can wait briefly. "
+        "If they ask for a delay, reroute, cancellation, or safety status, answer directly using only the available context; do not invent exact street names, ETAs, or vehicle details. "
+        "Keep responses to one or two short sentences unless the passenger asks for more detail."
     )

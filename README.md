@@ -53,6 +53,8 @@ GEMINI_MODEL=gemini-2.5-flash
 AGENTPHONE_API_KEY=
 AGENTPHONE_AGENT_ID=
 AGENTPHONE_WEBHOOK_SECRET=
+AGENTPHONE_VOICE=
+AGENTPHONE_FROM_NUMBER_ID=
 PASSENGER_PHONE_NUMBER=
 CARLA_HOST=localhost
 CARLA_PORT=2000
@@ -61,7 +63,9 @@ WEBHOOK_PORT=3000
 
 You can put these values in a local `.env` file at the project root. `config.py` loads it automatically for Python entrypoints, and `run_live.sh` sources it before starting CARLA/Omega. Existing exported shell variables take precedence over `.env` values.
 
-`AGENTPHONE_AGENT_ID` is required for outbound calls. AgentPhone's `POST /v1/calls` API requires `agentId` and `toNumber`; Omega sends the arrival script as `initialGreeting` and includes a `systemPrompt` for the built-in LLM conversation.
+`AGENTPHONE_AGENT_ID` is required for outbound calls. AgentPhone's `POST /v1/calls` API requires `agentId` and `toNumber`; Omega sends the arrival script as `initialGreeting` and includes a detailed `systemPrompt` for the built-in LLM conversation. Set the AgentPhone agent's voice mode to `hosted` for natural back-and-forth using this prompt. Use `webhook` mode only if you want AgentPhone to call Omega's `/webhook/agentphone` endpoint for every user turn.
+
+`AGENTPHONE_VOICE` and `AGENTPHONE_FROM_NUMBER_ID` are optional per-call overrides. Use them if you want to pick a specific voice or outbound caller number from AgentPhone.
 
 ## Modules
 
