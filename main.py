@@ -14,7 +14,7 @@ from caller import AgentPhoneCaller
 from capture import FrameCaptureService
 from config import Settings, settings
 from frame_store import LatestFrameStore
-from scenarios import apply_scenario
+from scenarios import apply_scenario, scenario_enabled, scenario_events
 from vlm import GeminiLiveVision
 from webhook import create_app
 
@@ -38,7 +38,17 @@ async def run_agent(settings: Settings) -> None:
     dashboard_task = asyncio.create_task(_dashboard(ride_agent, stop_event))
 
     try:
-        events = apply_scenario(settings, vision.analyze_stream(capture.frames()))
+        frames = capture.frames()
+        if scenario_enabled(settings):
+            logger.info(
+                "Scenario %s enabled; run_id=%s; sampling Gemini every %s frames and on arrival",
+                settings.scenario,
+                settings.scenario_run_id or "<none>",
+                settings.scenario_vlm_interval_frames,
+            )
+            events = scenario_events(settings, frames, vision)
+        else:
+            events = apply_scenario(settings, vision.analyze_stream(frames))
         agent_task = asyncio.create_task(ride_agent.run(events))
         stop_task = asyncio.create_task(stop_event.wait())
         done, pending = await asyncio.wait({agent_task, stop_task}, return_when=asyncio.FIRST_COMPLETED)

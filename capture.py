@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import logging
 import math
 from dataclasses import dataclass
+from pathlib import Path
 from typing import AsyncIterator
 
 from PIL import Image, ImageDraw
@@ -80,12 +82,39 @@ class FrameCaptureService:
 
     def _find_ego_vehicle(self, world: object) -> object:  # pragma: no cover - depends on CARLA runtime.
         actors = world.get_actors().filter("vehicle.*")
+        scenario_vehicle_id = self._scenario_vehicle_id()
+        if scenario_vehicle_id:
+            for actor in actors:
+                if actor.id == scenario_vehicle_id:
+                    logger.info("Using scenario vehicle id=%s for camera capture", actor.id)
+                    return actor
+            logger.warning("Scenario vehicle id=%s not found; falling back to hero vehicle", scenario_vehicle_id)
+
         for actor in actors:
             if actor.attributes.get("role_name") == "hero":
+                logger.info("Using hero vehicle id=%s for camera capture", actor.id)
                 return actor
         if actors:
+            logger.info("Using first available vehicle id=%s for camera capture", actors[0].id)
             return actors[0]
         raise RuntimeError("No vehicle actors found in CARLA world")
+
+    def _scenario_vehicle_id(self) -> int:
+        if self.settings.scenario_vehicle_id:
+            return self.settings.scenario_vehicle_id
+        path = Path(self.settings.scenario_state_file)
+        if not path.exists():
+            return 0
+        try:
+            payload = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            return 0
+        if self.settings.scenario_run_id and payload.get("run_id") != self.settings.scenario_run_id:
+            return 0
+        try:
+            return int(payload.get("vehicle_id") or 0)
+        except (TypeError, ValueError):
+            return 0
 
     def _on_carla_image(self, image: object) -> None:  # pragma: no cover - depends on CARLA runtime.
         data = bytes(image.raw_data)

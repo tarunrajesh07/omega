@@ -84,8 +84,11 @@ class Settings:
     destination_label: str = os.getenv("DESTINATION_LABEL", "the pickup point")
     landmark_label: str | None = os.getenv("LANDMARK_LABEL")
     scenario: str = os.getenv("SCENARIO", "live")
+    scenario_run_id: str = os.getenv("SCENARIO_RUN_ID", "")
     scenario_warmup_frames: int = _get_int("SCENARIO_WARMUP_FRAMES", 8)
     scenario_state_file: str = os.getenv("SCENARIO_STATE_FILE", ".omega_scenario_state.json")
+    scenario_vehicle_id: int = _get_int("SCENARIO_VEHICLE_ID", 0)
+    scenario_vlm_interval_frames: int = _get_int("SCENARIO_VLM_INTERVAL_FRAMES", 25)
     demo_mode: bool = _get_bool("DEMO_MODE", True)
     demo_frame_count: int = _get_int("DEMO_FRAME_COUNT", 40)
 

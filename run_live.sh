@@ -2,10 +2,18 @@
 set -euo pipefail
 
 if [[ -f .env ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
+  while IFS='=' read -r key value; do
+    [[ -z "${key// }" || "${key:0:1}" == "#" ]] && continue
+    key="${key%%[[:space:]]*}"
+    value="${value%$'\r'}"
+    value="${value%\"}"
+    value="${value#\"}"
+    value="${value%\'}"
+    value="${value#\'}"
+    if [[ -n "$key" && -z "${!key:-}" ]]; then
+      export "$key=$value"
+    fi
+  done < .env
 fi
 
 export DEMO_MODE=false
@@ -21,6 +29,7 @@ SPAWN_VEHICLE="${SPAWN_VEHICLE:-true}"
 ENABLE_AUTOPILOT="${ENABLE_AUTOPILOT:-true}"
 KEEP_SPAWNER_ALIVE="${KEEP_SPAWNER_ALIVE:-true}"
 SCENARIO="${SCENARIO:-live}"
+export SCENARIO_RUN_ID="${SCENARIO_RUN_ID:-$(date +%s)-$$}"
 
 if [[ "$SPAWN_VEHICLE" == "true" ]]; then
   args=(--host "$CARLA_HOST" --port "$CARLA_PORT")
@@ -30,7 +39,11 @@ if [[ "$SPAWN_VEHICLE" == "true" ]]; then
       --spawn-index "${SCENARIO_SPAWN_INDEX:-0}"
       --target-index "${SCENARIO_TARGET_INDEX:-1}"
       --arrival-distance "${SCENARIO_ARRIVAL_DISTANCE:-8}"
+      --min-route-distance "${SCENARIO_MIN_ROUTE_DISTANCE:-20}"
       --scenario-state-file "${SCENARIO_STATE_FILE:-.omega_scenario_state.json}"
+      --scenario-run-id "$SCENARIO_RUN_ID"
+      --exact-spawn
+      --destroy-existing-heroes
     )
   elif [[ "$ENABLE_AUTOPILOT" == "true" ]]; then
     args+=(--autopilot)
@@ -39,10 +52,10 @@ if [[ "$SPAWN_VEHICLE" == "true" ]]; then
     args+=(--keep-alive)
   fi
 
-  python spawn_carla_vehicle.py "${args[@]}" &
+  python -u spawn_carla_vehicle.py "${args[@]}" &
   SPAWNER_PID=$!
   trap 'kill "$SPAWNER_PID" 2>/dev/null || true' EXIT
-  sleep 2
+  sleep "${SPAWNER_STARTUP_SECONDS:-4}"
 fi
 
 python main.py --live "$@"

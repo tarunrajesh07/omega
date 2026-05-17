@@ -119,6 +119,12 @@ LANDMARK_LABEL="the glass office tower" \
 
 In this scenario, `run_live.sh` spawns the ego vehicle at `SCENARIO_SPAWN_INDEX`, drives it to `SCENARIO_TARGET_INDEX` using CARLA's `BasicAgent`, stops the car, follows it with the spectator camera, then triggers an arrival call like: `Your ride has arrived. I'm outside the pickup curb, near the glass office tower.`
 
+Scenario mode still samples Gemini periodically and forces one Gemini check when the destination is reached. Tune the sampling cadence with:
+
+```bash
+SCENARIO_VLM_INTERVAL_FRAMES=25 SCENARIO=arrival_landmark ./run_live.sh
+```
+
 Adjust how close the vehicle must get before it stops and calls:
 
 ```bash

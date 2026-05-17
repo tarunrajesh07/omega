@@ -27,6 +27,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-index", type=int, help="Map spawn point index to drive toward before holding position")
     parser.add_argument("--arrival-distance", type=float, default=8.0, help="Meters from target considered arrived")
     parser.add_argument("--scenario-state-file", default=settings.scenario_state_file)
+    parser.add_argument("--scenario-run-id", default=settings.scenario_run_id)
+    parser.add_argument("--min-route-distance", type=float, default=20.0, help="Reject target routes shorter than this many meters")
+    parser.add_argument("--max-drive-seconds", type=float, default=120.0, help="Abort target driving after this many seconds")
+    parser.add_argument("--exact-spawn", action="store_true", help="Use only --spawn-index and fail if that point is occupied")
+    parser.add_argument("--destroy-existing-heroes", action="store_true", help="Destroy existing role_name=hero vehicles before spawning")
     parser.add_argument("--hold-position", action="store_true", help="Disable physics so the vehicle remains at the spawn point")
     parser.add_argument("--list-spawns", action="store_true", help="List available spawn points and exit")
     return parser.parse_args()
@@ -55,6 +60,9 @@ def main() -> None:
     if not blueprints:
         raise RuntimeError(f"No vehicle blueprints matched {args.filter!r}")
 
+    if args.destroy_existing_heroes:
+        _destroy_existing_heroes(world)
+
     blueprint = random.choice(blueprints)
     blueprint.set_attribute("role_name", args.role_name)
     if blueprint.has_attribute("color"):
@@ -72,13 +80,18 @@ def main() -> None:
             )
         return
 
-    ordered_spawn_points = spawn_points[:]
-    if ordered_spawn_points:
-        first_index = args.spawn_index % len(ordered_spawn_points)
-        preferred = ordered_spawn_points[first_index]
-        rest = ordered_spawn_points[:first_index] + ordered_spawn_points[first_index + 1 :]
+    if not spawn_points:
+        raise RuntimeError("CARLA map has no spawn points")
+
+    first_index = args.spawn_index % len(spawn_points)
+    preferred = spawn_points[first_index]
+    if args.exact_spawn:
+        ordered_spawn_points = [preferred]
+    else:
+        rest = spawn_points[:first_index] + spawn_points[first_index + 1 :]
         random.shuffle(rest)
         ordered_spawn_points = [preferred] + rest
+
     vehicle = None
     for spawn_point in ordered_spawn_points:
         vehicle = world.try_spawn_actor(blueprint, spawn_point)
@@ -88,7 +101,12 @@ def main() -> None:
     if vehicle is None:
         raise RuntimeError("Could not spawn vehicle; all spawn points may be occupied")
 
-    print(f"Spawned {vehicle.type_id} id={vehicle.id} role_name={args.role_name}")
+    actual = vehicle.get_transform().location
+    print(
+        f"Spawned {vehicle.type_id} id={vehicle.id} role_name={args.role_name} "
+        f"at x={actual.x:.2f} y={actual.y:.2f} from requested spawn_index={args.spawn_index}",
+        flush=True,
+    )
 
     if args.hold_position:
         vehicle.set_simulate_physics(False)
@@ -96,6 +114,13 @@ def main() -> None:
 
     if args.target_index is not None:
         target = spawn_points[args.target_index % len(spawn_points)]
+        route_distance = _distance(vehicle.get_location(), target.location)
+        print(f"Route distance from spawn to target: {route_distance:.1f}m")
+        if route_distance < args.min_route_distance:
+            raise RuntimeError(
+                f"Spawn index {args.spawn_index} and target index {args.target_index} are only "
+                f"{route_distance:.1f}m apart. Choose farther points or lower --min-route-distance.",
+            )
         vehicle.set_autopilot(False)
         _drive_to_target(client, vehicle, target.location, args)
     elif args.autopilot and not args.hold_position:
@@ -124,7 +149,7 @@ def main() -> None:
 def _drive_to_target(client: object, vehicle: object, target_location: object, args: argparse.Namespace) -> None:
     from agents.navigation.basic_agent import BasicAgent
 
-    _write_scenario_state(args.scenario_state_file, "driving", vehicle.id, target_location)
+    _write_scenario_state(args.scenario_state_file, "driving", vehicle.id, target_location, args.scenario_run_id)
     agent = BasicAgent(vehicle, target_speed=25)
     agent.set_destination(target_location)
     world = vehicle.get_world()
@@ -133,20 +158,42 @@ def _drive_to_target(client: object, vehicle: object, target_location: object, a
         "Driving to target "
         f"x={target_location.x:.2f} y={target_location.y:.2f} z={target_location.z:.2f} "
         f"arrival_distance={args.arrival_distance:.1f}m",
+        flush=True,
     )
 
+    started_at = time.monotonic()
+    tick_count = 0
     while True:
-        if _distance(vehicle.get_location(), target_location) <= args.arrival_distance or agent.done():
+        distance = _distance(vehicle.get_location(), target_location)
+        if distance <= args.arrival_distance:
             vehicle.apply_control(_stop_control())
             vehicle.set_autopilot(False)
-            _write_scenario_state(args.scenario_state_file, "arrived", vehicle.id, target_location)
-            print("Arrived at target; vehicle stopped")
+            _write_scenario_state(args.scenario_state_file, "arrived", vehicle.id, target_location, args.scenario_run_id)
+            print(f"Arrived at target; vehicle stopped distance={distance:.1f}m", flush=True)
             return
+
+        if time.monotonic() - started_at > args.max_drive_seconds:
+            vehicle.apply_control(_stop_control())
+            raise RuntimeError(f"Timed out driving to target; last distance={distance:.1f}m")
+
+        if agent.done():
+            print(f"BasicAgent route done early while distance={distance:.1f}m; continuing until physically near target", flush=True)
 
         control = agent.run_step()
         control.manual_gear_shift = False
         vehicle.apply_control(control)
         world.wait_for_tick()
+        tick_count += 1
+        if tick_count % 20 == 0:
+            location = vehicle.get_location()
+            print(f"Driving progress distance={distance:.1f}m x={location.x:.1f} y={location.y:.1f}", flush=True)
+
+
+def _destroy_existing_heroes(world: object) -> None:
+    heroes = [actor for actor in world.get_actors().filter("vehicle.*") if actor.attributes.get("role_name") == "hero"]
+    for actor in heroes:
+        print(f"Destroying existing hero vehicle id={actor.id}", flush=True)
+        actor.destroy()
 
 
 def _distance(a: object, b: object) -> float:
@@ -159,10 +206,11 @@ def _stop_control() -> object:
     return carla.VehicleControl(throttle=0.0, brake=1.0, hand_brake=True)
 
 
-def _write_scenario_state(path: str, status: str, vehicle_id: int, target_location: object) -> None:
+def _write_scenario_state(path: str, status: str, vehicle_id: int, target_location: object, run_id: str) -> None:
     payload = {
         "status": status,
         "vehicle_id": vehicle_id,
+        "run_id": run_id,
         "target": {"x": target_location.x, "y": target_location.y, "z": target_location.z},
         "updated_at": time.time(),
     }
