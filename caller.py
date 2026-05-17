@@ -32,12 +32,12 @@ class AgentPhoneCaller:
         payload = {
             "agentId": self.settings.agentphone_agent_id,
             "toNumber": request.to_number,
+            "initialGreeting": request.script,
+            "systemPrompt": request.system_prompt,
             "metadata": {
                 "event": request.event_type.value,
                 "context": request.context,
             },
-            "initialMessage": request.script,
-            "systemPrompt": request.system_prompt,
         }
         headers = {
             "Authorization": f"Bearer {self.settings.agentphone_api_key}",
@@ -69,4 +69,3 @@ def build_system_prompt(request: CallRequest) -> str:
         f"You are calling about this event: {request.context}. Start with: {request.script} "
         "Answer questions briefly and clearly. If the passenger asks for an action, confirm it in one sentence."
     )
-

@@ -58,12 +58,12 @@ def _get_bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     google_api_key: str | None = os.getenv("GOOGLE_API_KEY")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-live-001")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     agentphone_api_key: str | None = os.getenv("AGENTPHONE_API_KEY")
     agentphone_agent_id: str | None = os.getenv("AGENTPHONE_AGENT_ID")
     agentphone_webhook_secret: str | None = os.getenv("AGENTPHONE_WEBHOOK_SECRET")
-    agentphone_base_url: str = os.getenv("AGENTPHONE_BASE_URL", "https://api.agentphone.com")
+    agentphone_base_url: str = os.getenv("AGENTPHONE_BASE_URL", "https://api.agentphone.ai")
     passenger_phone_number: str | None = os.getenv("PASSENGER_PHONE_NUMBER")
     passenger_name: str = os.getenv("PASSENGER_NAME", "passenger")
 

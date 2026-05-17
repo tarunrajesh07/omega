@@ -61,6 +61,8 @@ WEBHOOK_PORT=3000
 
 You can put these values in a local `.env` file at the project root. `config.py` loads it automatically for Python entrypoints, and `run_live.sh` sources it before starting CARLA/Omega. Existing exported shell variables take precedence over `.env` values.
 
+`AGENTPHONE_AGENT_ID` is required for outbound calls. AgentPhone's `POST /v1/calls` API requires `agentId` and `toNumber`; Omega sends the arrival script as `initialGreeting` and includes a `systemPrompt` for the built-in LLM conversation.
+
 ## Modules
 
 - `capture.py`: CARLA RGB camera capture with deterministic demo-frame fallback.
@@ -136,4 +138,23 @@ Tune the warmup before the call with:
 
 ```bash
 SCENARIO_WARMUP_FRAMES=12 SCENARIO=arrival_landmark ./run_live.sh
+```
+
+## One-Shot Arrival Call Test
+
+If the car is already at the pickup location and you only want to test the arrival call flow, run:
+
+```bash
+python test_arrival_landmark_call.py \
+  --destination "the pickup curb" \
+  --landmark "the glass office tower" \
+  --to "+15551234567"
+```
+
+This captures one CARLA camera frame, sends it to Gemini immediately, then calls the passenger through AgentPhone with an arrival script that includes the landmark and Gemini visual context. It does not drive the car or use the scenario state machine.
+
+Use a generated frame instead of CARLA for a dry smoke test:
+
+```bash
+python test_arrival_landmark_call.py --use-demo-frame --destination "the pickup curb" --landmark "the glass office tower"
 ```
