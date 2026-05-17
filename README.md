@@ -95,7 +95,10 @@ In live mode, `capture.py` follows the CARLA ego vehicle with the simulator spec
 ```bash
 FOLLOW_SPECTATOR=false ./run_live.sh
 SPECTATOR_DISTANCE=12 SPECTATOR_HEIGHT=6 ./run_live.sh
+SPECTATOR_UPDATE_HZ=45 SPECTATOR_SMOOTHING=0.10 ./run_live.sh
 ```
+
+`SPECTATOR_SMOOTHING` controls how quickly the chase camera catches up to the car. Lower values are smoother but lag farther behind; higher values track tighter but can look jumpier.
 
 The Flask server also exposes the camera frames that Omega is analyzing:
 
@@ -142,6 +145,82 @@ Tune the warmup before the call with:
 
 ```bash
 SCENARIO_WARMUP_FRAMES=12 SCENARIO=arrival_landmark ./run_live.sh
+```
+
+
+## Demo One
+
+Demo One is the pickup arrival landmark flow. It runs the deterministic `arrival_landmark` scenario with spawn point `0`, target point `20`, destination label `the pickup curb`, landmark label `the glass office tower`, and Gemini `gemini-2.5-flash` analysis on arrival.
+
+```bash
+./demo_one
+```
+
+It is equivalent to:
+
+```bash
+SCENARIO=arrival_landmark \
+SCENARIO_SPAWN_INDEX=0 \
+SCENARIO_TARGET_INDEX=20 \
+SCENARIO_ARRIVAL_DISTANCE=8 \
+SCENARIO_WARMUP_FRAMES=8 \
+SCENARIO_VLM_INTERVAL_FRAMES=10 \
+DESTINATION_LABEL="the pickup curb" \
+LANDMARK_LABEL="the glass office tower" \
+DEMO_MODE=false \
+GEMINI_MODEL=gemini-2.5-flash \
+./run_live.sh
+```
+
+You can override any setting inline, for example:
+
+```bash
+SCENARIO_TARGET_INDEX=24 LANDMARK_LABEL="the hotel entrance" ./demo_one
+```
+
+
+## Demo Two
+
+Demo Two is the reroute-request flow. The car starts already stopped at the pickup location, calls the passenger immediately, waits for the passenger to say `reroute`, then drives to a fixed second destination.
+
+```bash
+./demo_two
+```
+
+Defaults:
+
+```bash
+SCENARIO=reroute_request
+SCENARIO_SPAWN_INDEX=0
+SCENARIO_REROUTE_TARGET_INDEX=35
+DESTINATION_LABEL="the pickup location"
+REROUTE_DESTINATION_LABEL="the alternate pickup point"
+DEMO_REROUTE_TIMEOUT_SECONDS=15
+```
+
+If no passenger transcript/call-ended webhook arrives, Demo Two automatically reroutes after `DEMO_REROUTE_TIMEOUT_SECONDS`. You can tune it inline:
+
+```bash
+DEMO_REROUTE_TIMEOUT_SECONDS=8 ./demo_two
+```
+
+If AgentPhone is down or you want to test the second driving leg manually, run this in another terminal after the call should have happened:
+
+```bash
+python - <<'PY'
+import json, time
+from pathlib import Path
+path = Path('.omega_scenario_state.json')
+payload = json.loads(path.read_text())
+payload.update({'status': 'reroute_requested', 'command': 'reroute', 'updated_at': time.time()})
+path.write_text(json.dumps(payload))
+PY
+```
+
+You can override route points inline:
+
+```bash
+SCENARIO_SPAWN_INDEX=24 SCENARIO_REROUTE_TARGET_INDEX=40 ./demo_two
 ```
 
 ## One-Shot Arrival Call Test

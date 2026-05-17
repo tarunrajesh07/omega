@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Demo Two: start at pickup, call passenger immediately, then reroute to a fixed second destination.
+
+export SCENARIO="${SCENARIO:-reroute_request}"
+export SCENARIO_SPAWN_INDEX="${SCENARIO_SPAWN_INDEX:-5}"
+export SCENARIO_REROUTE_TARGET_INDEX="${SCENARIO_REROUTE_TARGET_INDEX:-7}"
+export SCENARIO_ARRIVAL_DISTANCE="${SCENARIO_ARRIVAL_DISTANCE:-8}"
+export SCENARIO_WARMUP_FRAMES="${SCENARIO_WARMUP_FRAMES:-0}"
+export DESTINATION_LABEL="${DESTINATION_LABEL:-the pickup location}"
+export REROUTE_DESTINATION_LABEL="${REROUTE_DESTINATION_LABEL:-the alternate pickup point}"
+export DEMO_REROUTE_TIMEOUT_SECONDS="${DEMO_REROUTE_TIMEOUT_SECONDS:-18}"
+export DEMO_MODE="${DEMO_MODE:-false}"
+export GEMINI_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
+export SPECTATOR_UPDATE_HZ="${SPECTATOR_UPDATE_HZ:-30}"
+export SPECTATOR_SMOOTHING="${SPECTATOR_SMOOTHING:-0.12}"
+export SPECTATOR_DISTANCE="${SPECTATOR_DISTANCE:-10}"
+export SPECTATOR_HEIGHT="${SPECTATOR_HEIGHT:-5}"
+export SPECTATOR_PITCH="${SPECTATOR_PITCH:--16}"
+
+exec ./run_live.sh "$@"

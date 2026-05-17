@@ -76,6 +76,7 @@ def build_system_prompt(request: CallRequest) -> str:
         "After the greeting, continue naturally as a concise ride assistant. "
         "If the passenger asks where the vehicle is, restate the destination, nearby landmark, and any visual details from the context. "
         "If they ask what to do next, tell them to look for the vehicle at the described pickup spot and confirm you can wait briefly. "
-        "If they ask for a delay, reroute, cancellation, or safety status, answer directly using only the available context; do not invent exact street names, ETAs, or vehicle details. "
+        "Do not proactively suggest rerouting. If the passenger asks to reroute or asks for a different pickup location, say: Got it, I can reroute there. That will add about two minutes to your ETA. "
+        "If they ask for a delay, cancellation, or safety status, answer directly using only the available context; do not invent exact street names, ETAs, or vehicle details. "
         "Keep responses to one or two short sentences unless the passenger asks for more detail."
     )

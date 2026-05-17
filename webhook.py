@@ -33,6 +33,16 @@ def create_app(
         ride_agent: RideAgent | None = app.config.get("ride_agent")
         return jsonify({"ok": True, "state": ride_agent.state.value if ride_agent else "standalone"})
 
+    @app.post("/demo/reroute")
+    def demo_reroute() -> Response:
+        ride_agent: RideAgent | None = app.config.get("ride_agent")
+        if ride_agent is None:
+            return jsonify({"error": "ride agent unavailable"}), 404
+        ride_agent.apply_passenger_decision(
+            PassengerDecision(action="reroute", transcript="manual demo reroute", call_id=None),
+        )
+        return jsonify({"ok": True, "state": ride_agent.state.value})
+
     @app.get("/camera.jpg")
     def camera_jpeg() -> Response:
         store: LatestFrameStore | None = app.config.get("frame_store")
@@ -84,6 +94,9 @@ def create_app(
 
         if event_type == "agent.call_ended":
             logger.info("Call ended payload=%s", payload)
+            ride_agent: RideAgent | None = app.config.get("ride_agent")
+            if ride_agent:
+                ride_agent.mark_call_ended(payload.get("callId") or payload.get("id"))
             return jsonify({"ok": True})
 
         return jsonify({"text": "I received that update."})
@@ -127,14 +140,14 @@ def _reply_for_decision(decision: str, transcript: str) -> str:
     if decision == "wait":
         return "Understood. I will wait here and update you when the route clears."
     if decision == "reroute":
-        return "Understood. I will take the safest alternate route and keep you updated."
+        return "Got it. I can reroute there. That will add about two minutes to your ETA."
     if decision == "cancel":
         return "Understood. I will cancel the ride and stop further routing."
     if decision == "resume":
         return "Understood. I will continue when it is safe to proceed."
     if transcript:
-        return "I heard you. Please say wait, reroute, or cancel so I can update the ride."
-    return "Please say wait, reroute, or cancel."
+        return "I heard you. I'm waiting here at the pickup location."
+    return "I'm waiting here at the pickup location."
 
 
 if __name__ == "__main__":

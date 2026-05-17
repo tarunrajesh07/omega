@@ -33,11 +33,10 @@ export SCENARIO_RUN_ID="${SCENARIO_RUN_ID:-$(date +%s)-$$}"
 
 if [[ "$SPAWN_VEHICLE" == "true" ]]; then
   args=(--host "$CARLA_HOST" --port "$CARLA_PORT")
-  if [[ "$SCENARIO" == "arrival_landmark" ]]; then
+  if [[ "$SCENARIO" == "arrival_landmark" || "$SCENARIO" == "reroute_request" ]]; then
     rm -f "${SCENARIO_STATE_FILE:-.omega_scenario_state.json}"
     args+=(
       --spawn-index "${SCENARIO_SPAWN_INDEX:-0}"
-      --target-index "${SCENARIO_TARGET_INDEX:-1}"
       --arrival-distance "${SCENARIO_ARRIVAL_DISTANCE:-8}"
       --min-route-distance "${SCENARIO_MIN_ROUTE_DISTANCE:-20}"
       --scenario-state-file "${SCENARIO_STATE_FILE:-.omega_scenario_state.json}"
@@ -45,6 +44,11 @@ if [[ "$SPAWN_VEHICLE" == "true" ]]; then
       --exact-spawn
       --destroy-existing-heroes
     )
+    if [[ "$SCENARIO" == "reroute_request" ]]; then
+      args+=(--arrive-at-spawn --reroute-target-index "${SCENARIO_REROUTE_TARGET_INDEX:-30}")
+    else
+      args+=(--target-index "${SCENARIO_TARGET_INDEX:-1}")
+    fi
   elif [[ "$ENABLE_AUTOPILOT" == "true" ]]; then
     args+=(--autopilot)
   fi

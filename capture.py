@@ -36,6 +36,7 @@ class FrameCaptureService:
         self._queue: asyncio.Queue[Frame] = asyncio.Queue(maxsize=3)
         self._handles: CarlaHandles | None = None
         self._running = False
+        self._spectator_transform = None
 
     async def frames(self) -> AsyncIterator[Frame]:
         if self.settings.demo_mode:
@@ -148,9 +149,10 @@ class FrameCaptureService:
 
     def _start_spectator_follow(self) -> None:  # pragma: no cover - depends on CARLA runtime.
         async def follow() -> None:
+            interval = 1.0 / max(self.settings.spectator_update_hz, 1.0)
             while self._running and self._handles is not None:
                 self._update_spectator()
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(interval)
 
         asyncio.create_task(follow())
 
@@ -158,6 +160,18 @@ class FrameCaptureService:
         if self._handles is None:
             return
         import carla
+
+        target = self._target_spectator_transform(carla)
+        alpha = max(0.01, min(self.settings.spectator_smoothing, 1.0))
+        if self._spectator_transform is None:
+            self._spectator_transform = target
+        else:
+            self._spectator_transform = self._lerp_transform(carla, self._spectator_transform, target, alpha)
+        self._handles.world.get_spectator().set_transform(self._spectator_transform)
+
+    def _target_spectator_transform(self, carla: object) -> object:  # pragma: no cover - depends on CARLA runtime.
+        if self._handles is None:
+            raise RuntimeError("CARLA handles are not available")
 
         vehicle_transform = self._handles.vehicle.get_transform()
         yaw_radians = math.radians(vehicle_transform.rotation.yaw)
@@ -168,11 +182,25 @@ class FrameCaptureService:
             z=vehicle_transform.location.z + self.settings.spectator_height,
         )
         rotation = carla.Rotation(
-            pitch=-18.0,
+            pitch=self.settings.spectator_pitch,
             yaw=vehicle_transform.rotation.yaw,
             roll=0.0,
         )
-        self._handles.world.get_spectator().set_transform(carla.Transform(location, rotation))
+        return carla.Transform(location, rotation)
+
+    def _lerp_transform(self, carla: object, current: object, target: object, alpha: float) -> object:
+        return carla.Transform(
+            carla.Location(
+                x=_lerp(current.location.x, target.location.x, alpha),
+                y=_lerp(current.location.y, target.location.y, alpha),
+                z=_lerp(current.location.z, target.location.z, alpha),
+            ),
+            carla.Rotation(
+                pitch=_lerp_angle(current.rotation.pitch, target.rotation.pitch, alpha),
+                yaw=_lerp_angle(current.rotation.yaw, target.rotation.yaw, alpha),
+                roll=_lerp_angle(current.rotation.roll, target.rotation.roll, alpha),
+            ),
+        )
 
     def _render_demo_frame(self, sequence: int) -> bytes:
         width = self.settings.camera_width
@@ -206,7 +234,17 @@ class FrameCaptureService:
 
     def close(self) -> None:
         self._running = False
+        self._spectator_transform = None
         if self._handles is not None:  # pragma: no cover - depends on CARLA runtime.
             self._handles.camera.stop()
             self._handles.camera.destroy()
             self._handles = None
+
+
+def _lerp(start: float, end: float, alpha: float) -> float:
+    return start + (end - start) * alpha
+
+
+def _lerp_angle(start: float, end: float, alpha: float) -> float:
+    delta = (end - start + 180.0) % 360.0 - 180.0
+    return start + delta * alpha

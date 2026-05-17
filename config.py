@@ -20,9 +20,20 @@ def load_dotenv(path: str | os.PathLike[str] = ".env") -> None:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        value = value.strip().strip('"').strip("'")
+        value = _parse_dotenv_value(value)
         if key:
             os.environ.setdefault(key, value)
+
+
+def _parse_dotenv_value(raw_value: str) -> str:
+    value = raw_value.strip()
+    if not value:
+        return ""
+    if value[0] in {"'", '"'}:
+        quote = value[0]
+        end = value.find(quote, 1)
+        return value[1:end] if end != -1 else value[1:]
+    return value.split("#", 1)[0].strip()
 
 
 load_dotenv()
@@ -79,6 +90,9 @@ class Settings:
     follow_spectator: bool = _get_bool("FOLLOW_SPECTATOR", True)
     spectator_distance: float = _get_float("SPECTATOR_DISTANCE", 8.0)
     spectator_height: float = _get_float("SPECTATOR_HEIGHT", 4.0)
+    spectator_pitch: float = _get_float("SPECTATOR_PITCH", -18.0)
+    spectator_update_hz: float = _get_float("SPECTATOR_UPDATE_HZ", 30.0)
+    spectator_smoothing: float = _get_float("SPECTATOR_SMOOTHING", 0.18)
 
     webhook_host: str = os.getenv("WEBHOOK_HOST", "0.0.0.0")
     webhook_port: int = _get_int("WEBHOOK_PORT", 3000)
@@ -90,7 +104,10 @@ class Settings:
     scenario_warmup_frames: int = _get_int("SCENARIO_WARMUP_FRAMES", 8)
     scenario_state_file: str = os.getenv("SCENARIO_STATE_FILE", ".omega_scenario_state.json")
     scenario_vehicle_id: int = _get_int("SCENARIO_VEHICLE_ID", 0)
+    reroute_destination_label: str = os.getenv("REROUTE_DESTINATION_LABEL", "the alternate pickup point")
+    demo_reroute_timeout_seconds: float = _get_float("DEMO_REROUTE_TIMEOUT_SECONDS", 15.0)
     scenario_vlm_interval_frames: int = _get_int("SCENARIO_VLM_INTERVAL_FRAMES", 25)
+    allow_scripted_vlm_calls: bool = _get_bool("ALLOW_SCRIPTED_VLM_CALLS", False)
     demo_mode: bool = _get_bool("DEMO_MODE", True)
     demo_frame_count: int = _get_int("DEMO_FRAME_COUNT", 40)
 
@@ -99,6 +116,7 @@ class Settings:
     hazard_threshold: int = _get_int("HAZARD_THRESHOLD", 2)
     rerouting_threshold: int = _get_int("REROUTING_THRESHOLD", 2)
     call_cooldown_seconds: float = _get_float("CALL_COOLDOWN_SECONDS", 20.0)
+    active_call_timeout_seconds: float = _get_float("ACTIVE_CALL_TIMEOUT_SECONDS", 180.0)
 
     llm_reply_model: str = os.getenv("LLM_REPLY_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 

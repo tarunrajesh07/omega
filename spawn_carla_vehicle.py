@@ -25,6 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keep-alive", action="store_true", help="Keep the script running so Ctrl+C destroys the vehicle")
     parser.add_argument("--spawn-index", type=int, default=0, help="Map spawn point index to try first")
     parser.add_argument("--target-index", type=int, help="Map spawn point index to drive toward before holding position")
+    parser.add_argument("--reroute-target-index", type=int, help="Second map spawn point index to drive toward after a reroute command")
     parser.add_argument("--arrival-distance", type=float, default=8.0, help="Meters from target considered arrived")
     parser.add_argument("--scenario-state-file", default=settings.scenario_state_file)
     parser.add_argument("--scenario-run-id", default=settings.scenario_run_id)
@@ -33,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--exact-spawn", action="store_true", help="Use only --spawn-index and fail if that point is occupied")
     parser.add_argument("--destroy-existing-heroes", action="store_true", help="Destroy existing role_name=hero vehicles before spawning")
     parser.add_argument("--hold-position", action="store_true", help="Disable physics so the vehicle remains at the spawn point")
+    parser.add_argument("--arrive-at-spawn", action="store_true", help="Mark the vehicle arrived immediately at its spawn point before any reroute leg")
     parser.add_argument("--list-spawns", action="store_true", help="List available spawn points and exit")
     return parser.parse_args()
 
@@ -112,7 +114,23 @@ def main() -> None:
         vehicle.set_simulate_physics(False)
         print("Vehicle physics disabled; holding position for scenario")
 
-    if args.target_index is not None:
+    if args.arrive_at_spawn:
+        vehicle.apply_control(_stop_control())
+        vehicle.set_autopilot(False)
+        _write_scenario_state(args.scenario_state_file, "arrived", vehicle.id, vehicle.get_location(), args.scenario_run_id)
+        print("Marked vehicle arrived at spawn; waiting at pickup location", flush=True)
+        if args.reroute_target_index is not None:
+            reroute_target = spawn_points[args.reroute_target_index % len(spawn_points)]
+            _wait_for_reroute_command(args.scenario_state_file, args.scenario_run_id)
+            _drive_to_target(
+                client,
+                vehicle,
+                reroute_target.location,
+                args,
+                driving_status="rerouting",
+                arrived_status="reroute_arrived",
+            )
+    elif args.target_index is not None:
         target = spawn_points[args.target_index % len(spawn_points)]
         route_distance = _distance(vehicle.get_location(), target.location)
         print(f"Route distance from spawn to target: {route_distance:.1f}m")
@@ -123,6 +141,17 @@ def main() -> None:
             )
         vehicle.set_autopilot(False)
         _drive_to_target(client, vehicle, target.location, args)
+        if args.reroute_target_index is not None:
+            reroute_target = spawn_points[args.reroute_target_index % len(spawn_points)]
+            _wait_for_reroute_command(args.scenario_state_file, args.scenario_run_id)
+            _drive_to_target(
+                client,
+                vehicle,
+                reroute_target.location,
+                args,
+                driving_status="rerouting",
+                arrived_status="reroute_arrived",
+            )
     elif args.autopilot and not args.hold_position:
         traffic_manager = client.get_trafficmanager(args.tm_port)
         traffic_manager.set_global_distance_to_leading_vehicle(2.5)
@@ -146,10 +175,17 @@ def main() -> None:
             vehicle.destroy()
 
 
-def _drive_to_target(client: object, vehicle: object, target_location: object, args: argparse.Namespace) -> None:
+def _drive_to_target(
+    client: object,
+    vehicle: object,
+    target_location: object,
+    args: argparse.Namespace,
+    driving_status: str = "driving",
+    arrived_status: str = "arrived",
+) -> None:
     from agents.navigation.basic_agent import BasicAgent
 
-    _write_scenario_state(args.scenario_state_file, "driving", vehicle.id, target_location, args.scenario_run_id)
+    _write_scenario_state(args.scenario_state_file, driving_status, vehicle.id, target_location, args.scenario_run_id)
     agent = BasicAgent(vehicle, target_speed=25)
     agent.set_destination(target_location)
     world = vehicle.get_world()
@@ -168,8 +204,8 @@ def _drive_to_target(client: object, vehicle: object, target_location: object, a
         if distance <= args.arrival_distance:
             vehicle.apply_control(_stop_control())
             vehicle.set_autopilot(False)
-            _write_scenario_state(args.scenario_state_file, "arrived", vehicle.id, target_location, args.scenario_run_id)
-            print(f"Arrived at target; vehicle stopped distance={distance:.1f}m", flush=True)
+            _write_scenario_state(args.scenario_state_file, arrived_status, vehicle.id, target_location, args.scenario_run_id)
+            print(f"Arrived at target status={arrived_status}; vehicle stopped distance={distance:.1f}m", flush=True)
             return
 
         if time.monotonic() - started_at > args.max_drive_seconds:
@@ -187,6 +223,27 @@ def _drive_to_target(client: object, vehicle: object, target_location: object, a
         if tick_count % 20 == 0:
             location = vehicle.get_location()
             print(f"Driving progress distance={distance:.1f}m x={location.x:.1f} y={location.y:.1f}", flush=True)
+
+
+def _wait_for_reroute_command(path: str, run_id: str) -> None:
+    print("Waiting for passenger reroute command", flush=True)
+    while True:
+        payload = _read_scenario_state(path)
+        if payload and (not run_id or payload.get("run_id") == run_id):
+            if payload.get("command") == "reroute" or payload.get("status") == "reroute_requested":
+                print("Passenger reroute command received", flush=True)
+                return
+        time.sleep(0.25)
+
+
+def _read_scenario_state(path: str) -> dict | None:
+    state_path = Path(path)
+    if not state_path.exists():
+        return None
+    try:
+        return json.loads(state_path.read_text())
+    except json.JSONDecodeError:
+        return None
 
 
 def _destroy_existing_heroes(world: object) -> None:

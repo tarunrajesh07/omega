@@ -80,6 +80,30 @@ class VisionEvent:
 
 
 @dataclass(frozen=True)
+class SceneDescription:
+    summary: str
+    pickup_cue: str | None = None
+    visible_landmark: str | None = None
+    confidence: float = 0.0
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> "SceneDescription":
+        confidence = payload.get("confidence", 0.0)
+        try:
+            confidence_value = float(confidence)
+        except (TypeError, ValueError):
+            confidence_value = 0.0
+        return cls(
+            summary=str(payload.get("summary") or payload.get("reason") or "No scene description provided."),
+            pickup_cue=payload.get("pickup_cue"),
+            visible_landmark=payload.get("visible_landmark"),
+            confidence=confidence_value,
+            raw=payload,
+        )
+
+
+@dataclass(frozen=True)
 class CallRequest:
     event_type: EventType
     script: str
