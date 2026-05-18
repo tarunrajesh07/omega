@@ -41,6 +41,7 @@ if [[ "$SPAWN_VEHICLE" == "true" ]]; then
       --curb-offset-feet "${SCENARIO_CURB_OFFSET_FEET:-0}"
       --start-curb-offset-feet "${SCENARIO_START_CURB_OFFSET_FEET:-0}"
       --curb-pull-over-seconds "${SCENARIO_CURB_PULL_OVER_SECONDS:-8}"
+      --curb-straighten-seconds "${SCENARIO_CURB_STRAIGHTEN_SECONDS:-2}"
       --min-route-distance "${SCENARIO_MIN_ROUTE_DISTANCE:-20}"
       --scenario-state-file "${SCENARIO_STATE_FILE:-.omega_scenario_state.json}"
       --scenario-run-id "$SCENARIO_RUN_ID"

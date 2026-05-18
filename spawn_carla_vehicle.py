@@ -33,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--curb-offset-feet", type=float, default=0.0, help="After arrival, pull over this many feet to the vehicle's right before marking arrived")
     parser.add_argument("--start-curb-offset-feet", type=float, default=0.0, help="Immediately place the spawned vehicle this many feet to its right before the scenario starts")
     parser.add_argument("--curb-pull-over-seconds", type=float, default=8.0, help="Maximum seconds to spend on the curb pull-over maneuver")
+    parser.add_argument("--curb-straighten-seconds", type=float, default=2.0, help="Seconds spent straightening after curb pull-over; use 0 to stop immediately")
     parser.add_argument("--scenario-state-file", default=settings.scenario_state_file)
     parser.add_argument("--scenario-run-id", default=settings.scenario_run_id)
     parser.add_argument("--min-route-distance", type=float, default=20.0, help="Reject target routes shorter than this many meters")
@@ -215,7 +216,7 @@ def _drive_to_target(
         if distance <= args.arrival_distance:
             vehicle.set_autopilot(False)
             if args.curb_offset_feet:
-                _pull_over_right(vehicle, args.curb_offset_feet, args.curb_pull_over_seconds)
+                _pull_over_right(vehicle, args.curb_offset_feet, args.curb_pull_over_seconds, args.curb_straighten_seconds)
             else:
                 vehicle.apply_control(_stop_control())
             _write_scenario_state(args.scenario_state_file, arrived_status, vehicle.id, target_location, args.scenario_run_id)
@@ -292,7 +293,7 @@ def _stop_control() -> object:
     return carla.VehicleControl(throttle=0.0, brake=1.0, hand_brake=True)
 
 
-def _pull_over_right(vehicle: object, offset_feet: float, max_seconds: float) -> None:
+def _pull_over_right(vehicle: object, offset_feet: float, max_seconds: float, straighten_seconds: float) -> None:
     import carla
 
     target_offset_meters = abs(offset_feet) * 0.3048
@@ -316,7 +317,8 @@ def _pull_over_right(vehicle: object, offset_feet: float, max_seconds: float) ->
         vehicle.apply_control(carla.VehicleControl(throttle=0.22, steer=0.38, brake=0.0, hand_brake=False))
         world.wait_for_tick()
 
-    _straighten_after_pull_over(vehicle, start_transform.rotation.yaw, duration_seconds=2.0)
+    if straighten_seconds > 0:
+        _straighten_after_pull_over(vehicle, start_transform.rotation.yaw, duration_seconds=straighten_seconds)
     vehicle.apply_control(_stop_control())
     print(
         f"Completed curb pull-over lateral={last_lateral / 0.3048:.1f}ft "
