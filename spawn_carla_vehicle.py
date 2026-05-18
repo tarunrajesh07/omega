@@ -28,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spawn-index", type=int, default=0, help="Map spawn point index to try first")
     parser.add_argument("--target-index", type=int, help="Map spawn point index to drive toward before holding position")
     parser.add_argument("--reroute-target-index", type=int, help="Second map spawn point index to drive toward after a reroute command")
+    parser.add_argument("--reroute-forward-meters", type=float, default=0.0, help="For reroute demos, drive to a waypoint this many meters ahead instead of a spawn-point target")
     parser.add_argument("--arrival-distance", type=float, default=8.0, help="Meters from target considered arrived")
     parser.add_argument("--curb-offset-feet", type=float, default=0.0, help="After arrival, pull over this many feet to the vehicle's right before marking arrived")
     parser.add_argument("--start-curb-offset-feet", type=float, default=0.0, help="Immediately place the spawned vehicle this many feet to its right before the scenario starts")
@@ -129,13 +130,13 @@ def main() -> None:
         vehicle.set_autopilot(False)
         _write_scenario_state(args.scenario_state_file, "arrived", vehicle.id, vehicle.get_location(), args.scenario_run_id)
         print("Marked vehicle arrived at spawn; waiting at pickup location", flush=True)
-        if args.reroute_target_index is not None:
-            reroute_target = spawn_points[args.reroute_target_index % len(spawn_points)]
+        if args.reroute_forward_meters > 0 or args.reroute_target_index is not None:
+            reroute_location = _nearby_forward_location(world, vehicle, args.reroute_forward_meters) if args.reroute_forward_meters > 0 else spawn_points[args.reroute_target_index % len(spawn_points)].location
             _wait_for_reroute_command(args.scenario_state_file, args.scenario_run_id)
             _drive_to_target(
                 client,
                 vehicle,
-                reroute_target.location,
+                reroute_location,
                 args,
                 driving_status="rerouting",
                 arrived_status="reroute_arrived",
@@ -247,6 +248,21 @@ def _wait_for_reroute_command(path: str, run_id: str) -> None:
                 print("Passenger reroute command received", flush=True)
                 return
         time.sleep(0.25)
+
+
+def _nearby_forward_location(world: object, vehicle: object, distance_meters: float) -> object:
+    carla_map = world.get_map()
+    waypoint = carla_map.get_waypoint(vehicle.get_location(), project_to_road=True)
+    next_waypoints = waypoint.next(distance_meters)
+    if not next_waypoints:
+        raise RuntimeError(f"No CARLA waypoint found {distance_meters:.1f}m ahead for nearby reroute")
+    target = next_waypoints[0].transform.location
+    print(
+        f"Nearby reroute target {distance_meters:.1f}m ahead "
+        f"x={target.x:.2f} y={target.y:.2f} z={target.z:.2f}",
+        flush=True,
+    )
+    return target
 
 
 def _read_scenario_state(path: str) -> dict | None:

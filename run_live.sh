@@ -48,7 +48,7 @@ if [[ "$SPAWN_VEHICLE" == "true" ]]; then
       --destroy-existing-heroes
     )
     if [[ "$SCENARIO" == "reroute_request" ]]; then
-      args+=(--arrive-at-spawn --reroute-target-index "${SCENARIO_REROUTE_TARGET_INDEX:-30}")
+      args+=(--arrive-at-spawn --reroute-target-index "${SCENARIO_REROUTE_TARGET_INDEX:-30}" --reroute-forward-meters "${SCENARIO_REROUTE_FORWARD_METERS:-0}")
     else
       args+=(--target-index "${SCENARIO_TARGET_INDEX:-1}")
     fi
