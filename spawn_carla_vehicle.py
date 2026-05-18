@@ -21,6 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=settings.carla_timeout_seconds)
     parser.add_argument("--filter", default="vehicle.tesla.model3", help="CARLA blueprint filter")
     parser.add_argument("--role-name", default="hero")
+    parser.add_argument("--color", default="255,216,0", help="Vehicle RGB color, for example 255,216,0 for yellow")
     parser.add_argument("--autopilot", action="store_true", help="Enable CARLA Traffic Manager autopilot")
     parser.add_argument("--tm-port", type=int, default=8000, help="Traffic Manager port")
     parser.add_argument("--keep-alive", action="store_true", help="Keep the script running so Ctrl+C destroys the vehicle")
@@ -29,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reroute-target-index", type=int, help="Second map spawn point index to drive toward after a reroute command")
     parser.add_argument("--arrival-distance", type=float, default=8.0, help="Meters from target considered arrived")
     parser.add_argument("--curb-offset-feet", type=float, default=0.0, help="After arrival, pull over this many feet to the vehicle's right before marking arrived")
+    parser.add_argument("--start-curb-offset-feet", type=float, default=0.0, help="Immediately place the spawned vehicle this many feet to its right before the scenario starts")
     parser.add_argument("--curb-pull-over-seconds", type=float, default=8.0, help="Maximum seconds to spend on the curb pull-over maneuver")
     parser.add_argument("--scenario-state-file", default=settings.scenario_state_file)
     parser.add_argument("--scenario-run-id", default=settings.scenario_run_id)
@@ -71,7 +73,7 @@ def main() -> None:
     blueprint = random.choice(blueprints)
     blueprint.set_attribute("role_name", args.role_name)
     if blueprint.has_attribute("color"):
-        color = random.choice(blueprint.get_attribute("color").recommended_values)
+        color = args.color or random.choice(blueprint.get_attribute("color").recommended_values)
         blueprint.set_attribute("color", color)
 
     spawn_points = world.get_map().get_spawn_points()
@@ -97,9 +99,11 @@ def main() -> None:
         random.shuffle(rest)
         ordered_spawn_points = [preferred] + rest
 
+    spawn_offset_feet = args.start_curb_offset_feet if args.arrive_at_spawn else 0.0
     vehicle = None
     for spawn_point in ordered_spawn_points:
-        vehicle = world.try_spawn_actor(blueprint, spawn_point)
+        attempted_spawn = _offset_spawn_transform(spawn_point, spawn_offset_feet) if spawn_offset_feet else spawn_point
+        vehicle = world.try_spawn_actor(blueprint, attempted_spawn)
         if vehicle is not None:
             break
 
@@ -107,9 +111,12 @@ def main() -> None:
         raise RuntimeError("Could not spawn vehicle; all spawn points may be occupied")
 
     actual = vehicle.get_transform().location
+    requested = _offset_spawn_transform(preferred, spawn_offset_feet).location if spawn_offset_feet else preferred.location
     print(
         f"Spawned {vehicle.type_id} id={vehicle.id} role_name={args.role_name} "
-        f"at x={actual.x:.2f} y={actual.y:.2f} from requested spawn_index={args.spawn_index}",
+        f"at x={actual.x:.2f} y={actual.y:.2f} "
+        f"requested x={requested.x:.2f} y={requested.y:.2f} "
+        f"spawn_index={args.spawn_index} start_offset={spawn_offset_feet:.1f}ft",
         flush=True,
     )
 
@@ -299,6 +306,21 @@ def _pull_over_right(vehicle: object, offset_feet: float, max_seconds: float) ->
         f"Completed curb pull-over lateral={last_lateral / 0.3048:.1f}ft "
         f"target={offset_feet:.1f}ft",
         flush=True,
+    )
+
+
+def _offset_spawn_transform(spawn_transform: object, offset_feet: float) -> object:
+    import carla
+
+    offset_meters = offset_feet * 0.3048
+    yaw = math.radians(spawn_transform.rotation.yaw)
+    return carla.Transform(
+        carla.Location(
+            x=spawn_transform.location.x + offset_meters * math.sin(yaw),
+            y=spawn_transform.location.y - offset_meters * math.cos(yaw),
+            z=spawn_transform.location.z,
+        ),
+        spawn_transform.rotation,
     )
 
 

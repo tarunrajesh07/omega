@@ -39,6 +39,7 @@ if [[ "$SPAWN_VEHICLE" == "true" ]]; then
       --spawn-index "${SCENARIO_SPAWN_INDEX:-0}"
       --arrival-distance "${SCENARIO_ARRIVAL_DISTANCE:-8}"
       --curb-offset-feet "${SCENARIO_CURB_OFFSET_FEET:-0}"
+      --start-curb-offset-feet "${SCENARIO_START_CURB_OFFSET_FEET:-0}"
       --curb-pull-over-seconds "${SCENARIO_CURB_PULL_OVER_SECONDS:-8}"
       --min-route-distance "${SCENARIO_MIN_ROUTE_DISTANCE:-20}"
       --scenario-state-file "${SCENARIO_STATE_FILE:-.omega_scenario_state.json}"
