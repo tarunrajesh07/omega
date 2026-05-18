@@ -62,7 +62,7 @@ export function LiveFeed({ ride }: { ride: DashboardRide }) {
       onDoubleClick={() => setView(INIT)}
       style={{
         position: 'relative', width: '100%', height: '100%',
-        background: '#060810', overflow: 'hidden',
+        background: 'linear-gradient(135deg, #211806 0%, #3b2a05 52%, #6b4b00 100%)', overflow: 'hidden',
         cursor: dragRef.current ? 'grabbing' : 'grab',
       }}
     >
@@ -97,9 +97,10 @@ export function LiveFeed({ ride }: { ride: DashboardRide }) {
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none' }}
           />
         ) : (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '11px', letterSpacing: '0.2em', color: '#1a2035', fontFamily: 'var(--mono)' }}>CARLA RGB CAMERA · EGO VEHICLE</div>
-            <div style={{ fontSize: '10px', color: '#111825', fontFamily: 'var(--mono)' }}>awaiting simulation feed</div>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '10px', background: 'radial-gradient(circle at center, rgba(250,204,21,0.20), transparent 19rem)' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '18px', background: '#facc15', color: '#342805', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px', fontWeight: 900, boxShadow: '0 16px 40px rgba(0,0,0,0.24)' }}>B</div>
+            <div style={{ fontSize: '11px', letterSpacing: '0.2em', color: '#ffe78a', fontFamily: 'var(--mono)', fontWeight: 700 }}>BANANA TAXI CAMERA</div>
+            <div style={{ fontSize: '10px', color: '#d6b33d', fontFamily: 'var(--mono)' }}>awaiting CARLA stream</div>
           </div>
         )}
       </div>
@@ -125,21 +126,21 @@ export function LiveFeed({ ride }: { ride: DashboardRide }) {
       {/* Frame counter */}
       <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10 }}>
         <div style={{ padding: '3px 8px', borderRadius: '3px', background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontSize: '10px', color: '#2a3555', fontFamily: 'var(--mono)' }}>F#{latest?.frameId ?? 0}</span>
+          <span style={{ fontSize: '10px', color: '#ffe78a', fontFamily: 'var(--mono)' }}>F#{latest?.frameId ?? 0}</span>
         </div>
       </div>
 
       {/* Ride info bottom-right */}
       <div style={{ position: 'absolute', bottom: '12px', right: '12px', zIndex: 10 }}>
         <div style={{ padding: '4px 8px', borderRadius: '3px', background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ fontSize: '10px', color: '#2a3555', fontFamily: 'var(--mono)', lineHeight: 1.5 }}>{ride.rideId} · {ride.passengerName}</div>
+          <div style={{ fontSize: '10px', color: '#ffe78a', fontFamily: 'var(--mono)', lineHeight: 1.5 }}>{ride.rideId} · {ride.passengerName}</div>
         </div>
       </div>
 
       {/* Zoom hint — only at 1× */}
       {view.scale === 1 && (
         <div style={{ position: 'absolute', bottom: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, pointerEvents: 'none' }}>
-          <span style={{ fontSize: '9px', color: '#1a2540', fontFamily: 'var(--mono)', letterSpacing: '0.08em' }}>
+          <span style={{ fontSize: '9px', color: '#d6b33d', fontFamily: 'var(--mono)', letterSpacing: '0.08em' }}>
             scroll to zoom · drag to pan · dbl-click to reset
           </span>
         </div>

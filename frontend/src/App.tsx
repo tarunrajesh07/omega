@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchDashboard, type DashboardRide } from './api';
 import { INITIAL_RIDE, type RideInfo } from './mockData';
+import bananaTaxiLogo from './assets/banana-taxi-logo.png';
 
 import { LiveFeed } from './components/LiveFeed';
 import { MiniMap } from './components/MiniMap';
@@ -58,16 +59,15 @@ export default function App() {
   }, []);
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--s0)', color: 'var(--text-1)', overflow: 'hidden' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'transparent', color: 'var(--text-1)', overflow: 'hidden' }}>
 
       {/* ── Header ── */}
-      <header style={{ height: '44px', flexShrink: 0, borderBottom: '1px solid var(--border)', background: 'var(--s1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', gap: '16px' }}>
+      <header style={{ height: '58px', flexShrink: 0, borderBottom: '1px solid var(--border)', background: 'linear-gradient(180deg, #3b2a05 0%, #2b2108 100%)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px', gap: '16px', boxShadow: '0 10px 28px rgba(74, 51, 0, 0.18)' }}>
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-          <div style={{ width: '24px', height: '24px', borderRadius: '4px', background: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#fff', letterSpacing: '0.05em' }}>C</div>
-          <span style={{ fontSize: '13px', fontWeight: 600 }}>CLARA</span>
-          <span style={{ fontSize: '10px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>Ops</span>
+          <img src={bananaTaxiLogo} alt="Banana Taxi" style={{ width: '218px', height: '48px', objectFit: 'contain', display: 'block' }} />
+          <span style={{ fontSize: '10px', color: '#ffe78a', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginLeft: '-8px' }}>Dispatch</span>
         </div>
 
         {/* Status dots + clock */}
@@ -79,10 +79,10 @@ export default function App() {
           ].map(({ label, ok }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <span className={ok ? 'blink' : ''} style={{ width: '5px', height: '5px', borderRadius: '50%', background: ok ? '#22c55e' : '#f59e0b', display: 'inline-block' }} />
-              <span style={{ color: 'var(--text-3)' }}>{label}</span>
+              <span style={{ color: '#ffe78a' }}>{label}</span>
             </div>
           ))}
-          <span style={{ color: 'var(--text-4)', borderLeft: '1px solid var(--border)', paddingLeft: '14px' }}>{clock}</span>
+          <span style={{ color: '#facc15', borderLeft: '1px solid rgba(250, 204, 21, 0.35)', paddingLeft: '14px' }}>{clock}</span>
         </div>
       </header>
 
@@ -101,7 +101,7 @@ export default function App() {
         </div>
 
         {/* Right sidebar */}
-        <div style={{ width: '300px', flexShrink: 0, borderLeft: '1px solid var(--border)', background: 'var(--s1)', overflowY: 'auto' }}>
+        <div style={{ width: '300px', flexShrink: 0, borderLeft: '1px solid var(--border)', background: 'rgba(255, 253, 240, 0.94)', overflowY: 'auto' }}>
           <Sidebar ride={ride} />
         </div>
       </div>

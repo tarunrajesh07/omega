@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --s0: #09090f;
-  --s1: #0f1119;
-  --s2: #151821;
-  --s3: #1c2030;
-  --border: #1e2535;
-  --border-subtle: #161926;
-  --text-1: #e2e8f0;
-  --text-2: #94a3b8;
-  --text-3: #475569;
-  --text-4: #2d3550;
+  --s0: #2b2108;
+  --s1: #fff7cf;
+  --s2: #ffed9f;
+  --s3: #f6d85c;
+  --border: #d1a91d;
+  --border-subtle: #e4c860;
+  --text-1: #342805;
+  --text-2: #67500b;
+  --text-3: #91710e;
+  --text-4: #b99012;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
   --sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
@@ -18,7 +18,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--s0);
+  background:
+    radial-gradient(circle at top left, rgba(250, 204, 21, 0.35), transparent 30rem),
+    radial-gradient(circle at bottom right, rgba(255, 237, 159, 0.22), transparent 28rem),
+    linear-gradient(135deg, #1f1806 0%, #3b2a05 54%, #6f5100 100%);
   color: var(--text-1);
   font-family: var(--sans);
   font-size: 13px;
@@ -30,7 +33,7 @@ body {
 
 /* Panel shared */
 .panel {
-  background: var(--s1);
+  background: rgba(255, 247, 207, 0.96);
   border: 1px solid var(--border);
   border-radius: 6px;
   display: flex;
@@ -69,11 +72,11 @@ body {
 
 /* Status colors */
 .state-en_route  { --sc: #22c55e; --sb: #0d1f14; --se: #163320; }
-.state-blocked   { --sc: #f59e0b; --sb: #1f1600; --se: #2e1f00; }
+.state-blocked   { --sc: #d97706; --sb: #fff4cf; --se: #ffe9a8; }
 .state-hazard    { --sc: #ef4444; --sb: #1f0a0a; --se: #2e1010; }
-.state-rerouting { --sc: #3b82f6; --sb: #0a1020; --se: #0f1830; }
-.state-arrived   { --sc: #a855f7; --sb: #150d1f; --se: #1e1030; }
-.state-idle      { --sc: #64748b; --sb: #111318; --se: #1a1f2e; }
+.state-rerouting { --sc: #0ea5e9; --sb: #e6f7ff; --se: #ccefff; }
+.state-arrived   { --sc: #f5b700; --sb: #fff6cc; --se: #ffe78a; }
+.state-idle      { --sc: #9b7a12; --sb: #fff8dc; --se: #fff0ad; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 3px; }

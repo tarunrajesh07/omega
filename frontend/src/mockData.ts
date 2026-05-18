@@ -136,7 +136,7 @@ export const INITIAL_RIDE: RideInfo = {
   ],
   transcript: [],
   eventLog: [
-    makeLogEntry('system', 'CLARA dashboard initialized', 'info'),
+    makeLogEntry('system', 'Banana Taxi dispatch initialized', 'info'),
     makeLogEntry('ride', 'Ride WMO-2847 started — passenger: Alex Chen', 'success'),
     makeLogEntry('vlm', 'Gemini Live session opened', 'info'),
     makeLogEntry('ride', 'En route to 123 Main St', 'info'),

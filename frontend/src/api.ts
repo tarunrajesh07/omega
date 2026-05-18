@@ -58,7 +58,7 @@ function normalizeDashboard(data: DashboardResponse): DashboardRide {
   const vlmEvents = lastEvent ? [lastEvent] : [];
   const eventLog = data.eventLog.length > 0
     ? data.eventLog.map(reviveLogEntry)
-    : [makeLogEntry('system', 'Connected to Omega backend', 'success')];
+    : [makeLogEntry('system', 'Connected to Banana Taxi backend', 'success')];
 
   return {
     ...INITIAL_RIDE,

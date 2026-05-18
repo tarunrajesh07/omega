@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { submitTranscript } from '../api';
+import { useEffect, useRef } from 'react';
 import type { RideInfo } from '../mockData';
 
 function fmt(s: number) {
@@ -17,8 +16,6 @@ function PhoneIcon({ color }: { color: string }) {
 
 export function Sidebar({ ride }: { ride: RideInfo }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [text, setText] = useState('');
-  const [status, setStatus] = useState<string | null>(null);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [ride.transcript]);
@@ -33,20 +30,6 @@ export function Sidebar({ ride }: { ride: RideInfo }) {
     ride.callState === 'calling'  ? 'DIALING...' :
     ride.callState === 'in_call'  ? 'IN CALL' :
     ride.callState === 'ended'    ? 'CALL ENDED' : 'STANDBY';
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const transcript = text.trim();
-    if (!transcript) return;
-    setStatus('sending...');
-    try {
-      const result = await submitTranscript(transcript);
-      setText('');
-      setStatus(`decision: ${result.decision}`);
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : String(err));
-    }
-  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 0 }}>
@@ -109,7 +92,7 @@ export function Sidebar({ ride }: { ride: RideInfo }) {
             ride.transcript.map((entry) => (
               <div key={entry.id} className="fade-in" style={{ marginBottom: '12px' }}>
                 <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', marginBottom: '3px', fontFamily: 'var(--mono)', color: entry.speaker === 'agent' ? '#3b82f6' : '#22c55e' }}>
-                  {entry.speaker === 'agent' ? 'CLARA (AGENT)' : 'PASSENGER'}
+                  {entry.speaker === 'agent' ? 'BANANA TAXI' : 'PASSENGER'}
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-2)', lineHeight: 1.55, paddingLeft: '8px', borderLeft: `2px solid ${entry.speaker === 'agent' ? '#1e3a5f' : '#14321e'}` }}>
                   {entry.text}
@@ -119,33 +102,6 @@ export function Sidebar({ ride }: { ride: RideInfo }) {
           )}
         </div>
 
-        <form onSubmit={onSubmit} style={{ marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.1em', color: 'var(--text-4)', textTransform: 'uppercase', marginBottom: '8px', fontFamily: 'var(--mono)' }}>
-            Provide Transcript
-          </div>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Type what the passenger said, e.g. reroute me to the alternate pickup"
-            rows={3}
-            style={{
-              width: '100%', boxSizing: 'border-box', resize: 'vertical', borderRadius: '4px',
-              background: 'var(--s2)', border: '1px solid var(--border)', color: 'var(--text-1)',
-              padding: '8px', fontSize: '12px', lineHeight: 1.4, outline: 'none',
-            }}
-          />
-          <button
-            type="submit"
-            style={{
-              width: '100%', marginTop: '8px', padding: '8px', borderRadius: '4px', cursor: 'pointer',
-              background: '#1d4ed8', border: '1px solid #2563eb', color: '#eff6ff',
-              fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', fontFamily: 'var(--mono)',
-            }}
-          >
-            Submit Passenger Line
-          </button>
-          {status && <div style={{ marginTop: '6px', color: 'var(--text-3)', fontSize: '10px', fontFamily: 'var(--mono)' }}>{status}</div>}
-        </form>
       </div>
     </div>
   );
