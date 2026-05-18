@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import random
 import signal
 import time
@@ -27,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-index", type=int, help="Map spawn point index to drive toward before holding position")
     parser.add_argument("--reroute-target-index", type=int, help="Second map spawn point index to drive toward after a reroute command")
     parser.add_argument("--arrival-distance", type=float, default=8.0, help="Meters from target considered arrived")
+    parser.add_argument("--curb-offset-feet", type=float, default=0.0, help="After arrival, pull over this many feet to the vehicle's right before marking arrived")
+    parser.add_argument("--curb-pull-over-seconds", type=float, default=8.0, help="Maximum seconds to spend on the curb pull-over maneuver")
     parser.add_argument("--scenario-state-file", default=settings.scenario_state_file)
     parser.add_argument("--scenario-run-id", default=settings.scenario_run_id)
     parser.add_argument("--min-route-distance", type=float, default=20.0, help="Reject target routes shorter than this many meters")
@@ -202,8 +205,11 @@ def _drive_to_target(
     while True:
         distance = _distance(vehicle.get_location(), target_location)
         if distance <= args.arrival_distance:
-            vehicle.apply_control(_stop_control())
             vehicle.set_autopilot(False)
+            if args.curb_offset_feet:
+                _pull_over_right(vehicle, args.curb_offset_feet, args.curb_pull_over_seconds)
+            else:
+                vehicle.apply_control(_stop_control())
             _write_scenario_state(args.scenario_state_file, arrived_status, vehicle.id, target_location, args.scenario_run_id)
             print(f"Arrived at target status={arrived_status}; vehicle stopped distance={distance:.1f}m", flush=True)
             return
@@ -261,6 +267,61 @@ def _stop_control() -> object:
     import carla
 
     return carla.VehicleControl(throttle=0.0, brake=1.0, hand_brake=True)
+
+
+def _pull_over_right(vehicle: object, offset_feet: float, max_seconds: float) -> None:
+    import carla
+
+    target_offset_meters = abs(offset_feet) * 0.3048
+    start_transform = vehicle.get_transform()
+    start_location = start_transform.location
+    right_vector = start_transform.get_right_vector()
+    world = vehicle.get_world()
+
+    print(f"Pulling over right toward curb target_offset={offset_feet:.1f}ft", flush=True)
+    started_at = time.monotonic()
+    last_lateral = 0.0
+    while time.monotonic() - started_at < max_seconds:
+        location = vehicle.get_location()
+        delta_x = location.x - start_location.x
+        delta_y = location.y - start_location.y
+        lateral = (delta_x * right_vector.x) + (delta_y * right_vector.y)
+        last_lateral = lateral
+        if lateral >= target_offset_meters:
+            break
+
+        vehicle.apply_control(carla.VehicleControl(throttle=0.22, steer=0.38, brake=0.0, hand_brake=False))
+        world.wait_for_tick()
+
+    _straighten_after_pull_over(vehicle, start_transform.rotation.yaw, duration_seconds=2.0)
+    vehicle.apply_control(_stop_control())
+    print(
+        f"Completed curb pull-over lateral={last_lateral / 0.3048:.1f}ft "
+        f"target={offset_feet:.1f}ft",
+        flush=True,
+    )
+
+
+def _straighten_after_pull_over(vehicle: object, target_yaw: float, duration_seconds: float) -> None:
+    import carla
+
+    world = vehicle.get_world()
+    started_at = time.monotonic()
+    while time.monotonic() - started_at < duration_seconds:
+        current_yaw = vehicle.get_transform().rotation.yaw
+        yaw_error = _angle_delta(target_yaw, current_yaw)
+        if abs(yaw_error) < 2.0:
+            break
+        steer = max(-0.35, min(0.35, yaw_error / 28.0))
+        vehicle.apply_control(carla.VehicleControl(throttle=0.16, steer=steer, brake=0.0, hand_brake=False))
+        world.wait_for_tick()
+
+    vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0, brake=0.7, hand_brake=False))
+    world.wait_for_tick()
+
+
+def _angle_delta(target: float, current: float) -> float:
+    return (target - current + 180.0) % 360.0 - 180.0
 
 
 def _write_scenario_state(path: str, status: str, vehicle_id: int, target_location: object, run_id: str) -> None:
