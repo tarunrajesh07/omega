@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { RideInfo } from '../mockData';
+import type { DashboardRide } from '../api';
 
 const W = 1000, H = 600;
 const COLS = [60, 165, 270, 375, 480, 585, 690, 795, 900];
@@ -56,7 +56,19 @@ const ALERT_CLR: Record<string, string> = { blocked: '#f59e0b', hazard: '#ef4444
 type View = { x: number; y: number; scale: number };
 const INIT: View = { x: 0, y: 0, scale: 1 };
 
-export function MiniMap({ ride }: { ride: RideInfo }) {
+function projectCarlaPoint(x: number, y: number, bounds: { minX: number; minY: number; maxX: number; maxY: number }): [number, number] {
+  const pad = 32;
+  const spanX = Math.max(bounds.maxX - bounds.minX, 1);
+  const spanY = Math.max(bounds.maxY - bounds.minY, 1);
+  const scale = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY);
+  const contentW = spanX * scale;
+  const contentH = spanY * scale;
+  const offsetX = (W - contentW) / 2;
+  const offsetY = (H - contentH) / 2;
+  return [offsetX + (x - bounds.minX) * scale, offsetY + (bounds.maxY - y) * scale];
+}
+
+export function MiniMap({ ride }: { ride: DashboardRide }) {
   const svgRef  = useRef<SVGSVGElement>(null);
   const viewRef = useRef<View>(INIT);
   const dragRef = useRef<{ mx: number; my: number; vx: number; vy: number } | null>(null);
@@ -101,8 +113,13 @@ export function MiniMap({ ride }: { ride: RideInfo }) {
 
   const isAlert  = ride.state === 'blocked' || ride.state === 'hazard';
   const carColor = isAlert ? ALERT_CLR[ride.state] : '#3b82f6';
+  const hasTelemetry = Boolean(ride.vehicleTelemetry);
+  const hasCarlaMap = Boolean(ride.carlaMap?.bounds && ride.carlaMap.segments.length > 0);
   const progress = Math.min(ride.carPosition.x / 100, 0.99);
-  const [cx, cy] = carPos(progress);
+  const [routeX, routeY] = carPos(progress);
+  const projectedVehicle = ride.vehicleTelemetry && ride.carlaMap?.bounds ? projectCarlaPoint(ride.vehicleTelemetry.x, ride.vehicleTelemetry.y, ride.carlaMap.bounds) : null;
+  const cx = projectedVehicle ? projectedVehicle[0] : hasTelemetry ? 40 + (ride.carPosition.x / 100) * (W - 80) : routeX;
+  const cy = projectedVehicle ? projectedVehicle[1] : hasTelemetry ? 40 + (ride.carPosition.y / 100) * (H - 80) : routeY;
 
   return (
     <div style={{
@@ -115,8 +132,15 @@ export function MiniMap({ ride }: { ride: RideInfo }) {
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <span style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.12em', color: '#334155', fontFamily: 'var(--mono)' }}>ROUTE MAP</span>
+        <span style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.12em', color: '#334155', fontFamily: 'var(--mono)' }}>
+          {hasCarlaMap ? ride.carlaMap?.name ?? 'CARLA MAP' : hasTelemetry ? 'CARLA MAP' : 'ROUTE MAP'}
+        </span>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {ride.vehicleTelemetry && (
+            <span style={{ fontSize: '9px', color: '#24324c', fontFamily: 'var(--mono)' }}>
+              x {ride.vehicleTelemetry.x.toFixed(0)} y {ride.vehicleTelemetry.y.toFixed(0)} · {(ride.vehicleTelemetry.speedMps * 2.237).toFixed(0)} mph
+            </span>
+          )}
           <span style={{ fontSize: '9px', color: '#1e2d40', fontFamily: 'var(--mono)' }}>{view.scale.toFixed(1)}×</span>
           <button
             onClick={() => setView(INIT)}
@@ -139,21 +163,26 @@ export function MiniMap({ ride }: { ride: RideInfo }) {
           onMouseLeave={onMouseLeave}
         >
           <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
-            {ROWS.slice(0, -1).map((y1, ri) =>
+            {!hasCarlaMap && ROWS.slice(0, -1).map((y1, ri) =>
               COLS.slice(0, -1).map((x1, ci) => (
                 <rect key={`${ci}-${ri}`} x={x1 + 6} y={y1 + 6} width={COLS[ci + 1] - x1 - 12} height={ROWS[ri + 1] - y1 - 12} fill="#0a0d18" rx="2" />
               ))
             )}
-            {ROWS.map((y, i) => <line key={`h${i}`} x1="20" y1={y} x2={W - 20} y2={y} stroke="#111828" strokeWidth="9" />)}
-            {COLS.map((x, i) => <line key={`v${i}`} x1={x} y1="20" x2={x} y2={H - 20} stroke="#111828" strokeWidth="9" />)}
-            {ROW_NAMES.map((n, i) => <text key={n} x="22" y={ROWS[i] - 4} fontSize="8" fill="#1a2540" fontFamily="monospace">{n}</text>)}
-            {COL_NAMES.map((n, i) => <text key={n} x={COLS[i]} y="14" fontSize="8" fill="#1a2540" fontFamily="monospace" textAnchor="middle">{n}</text>)}
-            <path d={FULL_PATH} fill="none" stroke="#142040" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <path d={traveledPath(progress)} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={PICKUP[0]} cy={PICKUP[1]} r="6" fill="#111828" stroke="#334155" strokeWidth="1.5" />
-            <circle cx={PICKUP[0]} cy={PICKUP[1]} r="2.5" fill="#475569" />
-            <circle cx={DEST[0]} cy={DEST[1]} r="7" fill="#031c12" stroke="#10b981" strokeWidth="1.5" />
-            <circle cx={DEST[0]} cy={DEST[1]} r="3" fill="#10b981" />
+            {!hasCarlaMap && ROWS.map((y, i) => <line key={`h${i}`} x1="20" y1={y} x2={W - 20} y2={y} stroke="#111828" strokeWidth="9" />)}
+            {!hasCarlaMap && COLS.map((x, i) => <line key={`v${i}`} x1={x} y1="20" x2={x} y2={H - 20} stroke="#111828" strokeWidth="9" />)}
+            {!hasCarlaMap && ROW_NAMES.map((n, i) => <text key={n} x="22" y={ROWS[i] - 4} fontSize="8" fill="#1a2540" fontFamily="monospace">{n}</text>)}
+            {!hasCarlaMap && COL_NAMES.map((n, i) => <text key={n} x={COLS[i]} y="14" fontSize="8" fill="#1a2540" fontFamily="monospace" textAnchor="middle">{n}</text>)}
+            {hasCarlaMap && ride.carlaMap?.bounds && ride.carlaMap.segments.map((segment, index) => {
+              const [x1, y1] = projectCarlaPoint(segment.x1, segment.y1, ride.carlaMap!.bounds!);
+              const [x2, y2] = projectCarlaPoint(segment.x2, segment.y2, ride.carlaMap!.bounds!);
+              return <line key={`${segment.roadId}-${segment.laneId}-${index}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#17233a" strokeWidth="3" strokeLinecap="round" />;
+            })}
+            {!hasCarlaMap && <path d={FULL_PATH} fill="none" stroke="#142040" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+            {!hasCarlaMap && !hasTelemetry && <path d={traveledPath(progress)} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+            {!hasCarlaMap && <circle cx={PICKUP[0]} cy={PICKUP[1]} r="6" fill="#111828" stroke="#334155" strokeWidth="1.5" />}
+            {!hasCarlaMap && <circle cx={PICKUP[0]} cy={PICKUP[1]} r="2.5" fill="#475569" />}
+            {!hasCarlaMap && <circle cx={DEST[0]} cy={DEST[1]} r="7" fill="#031c12" stroke="#10b981" strokeWidth="1.5" />}
+            {!hasCarlaMap && <circle cx={DEST[0]} cy={DEST[1]} r="3" fill="#10b981" />}
             {isAlert && <circle cx={cx} cy={cy} r="16" fill={carColor} opacity="0.1" />}
             <circle cx={cx} cy={cy} r="6" fill={carColor} />
             <circle cx={cx} cy={cy} r="10" fill="none" stroke={carColor} strokeWidth="1.5" opacity="0.4" />

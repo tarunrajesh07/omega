@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { RideInfo } from '../mockData';
+import type { DashboardRide } from '../api';
 
 type View = { x: number; y: number; scale: number };
 const INIT: View = { x: 0, y: 0, scale: 1 };
 
-export function LiveFeed({ ride }: { ride: RideInfo }) {
+export function LiveFeed({ ride }: { ride: DashboardRide }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef      = useRef<View>(INIT);
   const dragRef      = useRef<{ mx: number; my: number; vx: number; vy: number } | null>(null);
@@ -89,11 +89,19 @@ export function LiveFeed({ ride }: { ride: RideInfo }) {
           <line x1="47%" y1="50%" x2="53%" y2="50%" stroke="#fff" strokeWidth="0.5" />
         </svg>
 
-        {/* Placeholder */}
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ fontSize: '11px', letterSpacing: '0.2em', color: '#1a2035', fontFamily: 'var(--mono)' }}>CARLA RGB CAMERA · EGO VEHICLE</div>
-          <div style={{ fontSize: '10px', color: '#111825', fontFamily: 'var(--mono)' }}>awaiting simulation feed</div>
-        </div>
+        {ride.cameraAvailable ? (
+          <img
+            src={ride.cameraStreamUrl}
+            alt="CARLA ego vehicle camera"
+            draggable={false}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none' }}
+          />
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontSize: '11px', letterSpacing: '0.2em', color: '#1a2035', fontFamily: 'var(--mono)' }}>CARLA RGB CAMERA · EGO VEHICLE</div>
+            <div style={{ fontSize: '10px', color: '#111825', fontFamily: 'var(--mono)' }}>awaiting simulation feed</div>
+          </div>
+        )}
       </div>
 
       {/* ── Fixed HUD (stays put when zooming) ── */}

@@ -40,6 +40,16 @@ class Frame:
 
 
 @dataclass(frozen=True)
+class VehicleTelemetry:
+    x: float
+    y: float
+    z: float
+    yaw: float
+    speed_mps: float
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@dataclass(frozen=True)
 class VisionEvent:
     event_type: EventType
     reason: str

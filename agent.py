@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from collections import deque
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import AsyncIterator, Deque
 
 from caller import AgentPhoneCaller, build_system_prompt
@@ -28,6 +29,8 @@ class RideAgent:
     state: RideState = RideState.IDLE
     last_event: VisionEvent | None = None
     call_log: list[str] = field(default_factory=list)
+    transcript_log: list[dict[str, str]] = field(default_factory=list)
+    event_log: list[dict[str, str]] = field(default_factory=list)
     _recent_events: Deque[EventType] = field(default_factory=lambda: deque(maxlen=6))
     _last_call_by_event: dict[EventType, float] = field(default_factory=dict)
     _called_events: set[EventType] = field(default_factory=set)
@@ -78,6 +81,8 @@ class RideAgent:
             self._active_call_started_at = now
             self._schedule_demo_reroute_timeout(event)
         self.call_log.append(f"{event.event_type.value}: {request.script} ({result.message})")
+        self.record_transcript("agent", request.script)
+        self.record_event("call", f"{event.event_type.value}: {result.message}")
 
     def mark_call_ended(self, call_id: str | None = None) -> None:
         if call_id and self._active_call_id and call_id != self._active_call_id:
@@ -86,6 +91,7 @@ class RideAgent:
         logger.info("Call ended: %s", call_id or self._active_call_id or "<unknown>")
         self._active_call_id = None
         self._active_call_started_at = None
+        self.record_event("call", "Call ended")
         if self.settings.scenario.strip().lower() == "reroute_request" and self._last_passenger_decision is None:
             logger.info("Demo 2 call ended without a transcript decision; defaulting to reroute")
             self._last_passenger_decision = "reroute"
@@ -96,6 +102,9 @@ class RideAgent:
         normalized = decision.action.lower().strip()
         self._last_passenger_decision = normalized
         logger.info("Passenger decision=%s transcript=%s", normalized, decision.transcript)
+        if decision.transcript:
+            self.record_transcript("passenger", decision.transcript)
+        self.record_event("call", f"Passenger decision: {normalized}")
         if normalized == "cancel":
             self.state = RideState.CANCELLED
         elif normalized == "reroute":
@@ -105,6 +114,29 @@ class RideAgent:
             self.state = RideState.BLOCKED
         elif normalized == "resume":
             self.state = RideState.EN_ROUTE
+
+    def record_transcript(self, speaker: str, text: str) -> None:
+        if not text:
+            return
+        self.transcript_log.append(
+            {
+                "id": f"t-{len(self.transcript_log) + 1}",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "speaker": speaker,
+                "text": text,
+            },
+        )
+
+    def record_event(self, category: str, message: str, severity: str = "info") -> None:
+        self.event_log.append(
+            {
+                "id": f"e-{len(self.event_log) + 1}",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "category": category,
+                "message": message,
+                "severity": severity,
+            },
+        )
 
     def _schedule_demo_reroute_timeout(self, event: VisionEvent) -> None:
         if self.settings.scenario.strip().lower() != "reroute_request":

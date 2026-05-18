@@ -86,6 +86,8 @@ class Settings:
     camera_width: int = _get_int("CAMERA_WIDTH", 800)
     camera_height: int = _get_int("CAMERA_HEIGHT", 600)
     camera_fov: float = _get_float("CAMERA_FOV", 90.0)
+    camera_view: str = os.getenv("CAMERA_VIEW", "ego")
+    camera_jpeg_quality: int = _get_int("CAMERA_JPEG_QUALITY", 88)
     frame_rate: float = _get_float("FRAME_RATE", 5.0)
     follow_spectator: bool = _get_bool("FOLLOW_SPECTATOR", True)
     spectator_distance: float = _get_float("SPECTATOR_DISTANCE", 8.0)

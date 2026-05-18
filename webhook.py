@@ -33,6 +33,64 @@ def create_app(
         ride_agent: RideAgent | None = app.config.get("ride_agent")
         return jsonify({"ok": True, "state": ride_agent.state.value if ride_agent else "standalone"})
 
+    @app.get("/api/dashboard")
+    def dashboard() -> Response:
+        ride_agent: RideAgent | None = app.config.get("ride_agent")
+        store: LatestFrameStore | None = app.config.get("frame_store")
+        frame = store.latest() if store else None
+        telemetry = store.latest_telemetry() if store else None
+        map_payload = store.latest_map() if store else None
+        current_settings: Settings = app.config.get("settings") or settings
+        event = ride_agent.last_event if ride_agent else None
+        return jsonify(
+            {
+                "rideId": current_settings.scenario_run_id or "omega-live",
+                "passengerName": current_settings.passenger_name,
+                "passengerPhone": current_settings.passenger_phone_number or "not configured",
+                "pickup": current_settings.destination_label,
+                "destination": current_settings.reroute_destination_label,
+                "state": ride_agent.state.value if ride_agent else "idle",
+                "callState": _call_state(ride_agent),
+                "callDuration": _call_duration(ride_agent),
+                "callLog": ride_agent.call_log if ride_agent else [],
+                "transcript": ride_agent.transcript_log if ride_agent else [],
+                "eventLog": ride_agent.event_log if ride_agent else [],
+                "lastEvent": _event_payload(event),
+                "frame": _frame_payload(frame),
+                "vehicle": _telemetry_payload(telemetry),
+                "map": map_payload,
+                "camera": {
+                    "snapshotUrl": "/camera.jpg",
+                    "streamUrl": "/camera.mjpg",
+                    "available": frame is not None,
+                },
+                "integrations": {
+                    "carla": frame is not None and frame.source == "carla",
+                    "gemini": bool(current_settings.google_api_key),
+                    "agentphone": bool(current_settings.agentphone_api_key),
+                },
+            },
+        )
+
+    @app.post("/api/transcript")
+    def submit_transcript() -> Response:
+        ride_agent: RideAgent | None = app.config.get("ride_agent")
+        if ride_agent is None:
+            return jsonify({"error": "ride agent unavailable"}), 404
+        payload: dict[str, Any] = request.get_json(silent=True) or {}
+        transcript = str(payload.get("text") or payload.get("transcript") or "").strip()
+        if not transcript:
+            return jsonify({"error": "text is required"}), 400
+        decision = _classify_decision(transcript)
+        if decision == "unknown":
+            ride_agent.record_transcript("passenger", transcript)
+            ride_agent.record_event("call", "Passenger transcript received")
+        else:
+            ride_agent.apply_passenger_decision(
+                PassengerDecision(action=decision, transcript=transcript, call_id=payload.get("callId")),
+            )
+        return jsonify({"ok": True, "decision": decision, "reply": _reply_for_decision(decision, transcript)})
+
     @app.post("/demo/reroute")
     def demo_reroute() -> Response:
         ride_agent: RideAgent | None = app.config.get("ride_agent")
@@ -90,6 +148,9 @@ def create_app(
                 ride_agent.apply_passenger_decision(
                     PassengerDecision(action=decision, transcript=transcript, call_id=payload.get("callId")),
                 )
+            elif ride_agent and transcript:
+                ride_agent.record_transcript("passenger", transcript)
+                ride_agent.record_event("call", "AgentPhone transcript received")
             return jsonify({"text": _reply_for_decision(decision, transcript)})
 
         if event_type == "agent.call_ended":
@@ -102,6 +163,57 @@ def create_app(
         return jsonify({"text": "I received that update."})
 
     return app
+
+
+def _call_state(agent: RideAgent | None) -> str:
+    if agent is None:
+        return "none"
+    if agent._active_call_started_at is not None:
+        return "in_call"
+    return "ended" if agent.call_log else "none"
+
+
+def _call_duration(agent: RideAgent | None) -> int:
+    if agent is None or agent._active_call_started_at is None:
+        return 0
+    return max(0, int(time.monotonic() - agent._active_call_started_at))
+
+
+def _event_payload(event: Any) -> dict[str, Any] | None:
+    if event is None:
+        return None
+    return {
+        "id": f"vlm-{int(event.timestamp.timestamp() * 1000)}",
+        "timestamp": event.timestamp.isoformat(),
+        "type": event.event_type.value,
+        "reason": event.reason,
+        "confidence": event.confidence,
+        "frameId": event.raw.get("frame") or event.raw.get("frame_id") or 0,
+    }
+
+
+def _frame_payload(frame: Any) -> dict[str, Any] | None:
+    if frame is None:
+        return None
+    return {
+        "sequence": frame.sequence,
+        "timestamp": frame.timestamp.isoformat(),
+        "source": frame.source,
+        "sizeBytes": frame.size_bytes,
+    }
+
+
+def _telemetry_payload(telemetry: Any) -> dict[str, Any] | None:
+    if telemetry is None:
+        return None
+    return {
+        "x": telemetry.x,
+        "y": telemetry.y,
+        "z": telemetry.z,
+        "yaw": telemetry.yaw,
+        "speedMps": telemetry.speed_mps,
+        "timestamp": telemetry.timestamp.isoformat(),
+    }
 
 
 def _valid_signature(body: bytes, headers: Any, settings: Settings) -> bool:

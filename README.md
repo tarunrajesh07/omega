@@ -100,6 +100,22 @@ SPECTATOR_UPDATE_HZ=45 SPECTATOR_SMOOTHING=0.10 ./run_live.sh
 
 `SPECTATOR_SMOOTHING` controls how quickly the chase camera catches up to the car. Lower values are smoother but lag farther behind; higher values track tighter but can look jumpier.
 
+The streamed frontend camera defaults to the ego/front camera. To stream a third-person chase view instead, run with:
+
+```bash
+CAMERA_VIEW=chase ./run_live.sh
+```
+
+`CAMERA_VIEW=chase` uses a CARLA RGB sensor placed at the same chase transform as the spectator camera. CARLA does not expose the actual simulator viewport pixels through its Python API, so this is the closest API-native view to what you see in the simulator window.
+
+Increase stream resolution and JPEG quality with:
+
+```bash
+CAMERA_WIDTH=1920 CAMERA_HEIGHT=1080 CAMERA_JPEG_QUALITY=95 CAMERA_VIEW=chase ./run_live.sh
+```
+
+Higher values look much better in the frontend but cost more simulator/GPU/CPU/network bandwidth.
+
 The Flask server also exposes the camera frames that Omega is analyzing:
 
 ```text
