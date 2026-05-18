@@ -223,6 +223,35 @@ You can override route points inline:
 SCENARIO_SPAWN_INDEX=24 SCENARIO_REROUTE_TARGET_INDEX=40 ./demo_two
 ```
 
+
+## AgentPhone Response Test
+
+Use this to verify whether AgentPhone sends user speech/transcript events back to Omega. It does not use CARLA or Gemini.
+
+Start a public tunnel to the test webhook port:
+
+```bash
+ngrok http 3010
+```
+
+Configure your AgentPhone agent/webhook URL to the tunnel URL plus this path:
+
+```text
+https://YOUR-NGROK-DOMAIN/agentphone-test
+```
+
+Then run the test in another terminal:
+
+```bash
+python test_agentphone_response.py \
+  --to "+15551234567" \
+  --expected "banana taxi"
+```
+
+When the call arrives, say the exact expected phrase. The script prints whether webhook events arrived, whether any transcript/message text was present, and whether the expected phrase was detected.
+
+If it reports `events_received=0`, AgentPhone is not reaching the webhook URL. If events arrive but `transcripts: <none>`, AgentPhone is posting lifecycle events but not user speech text for this agent mode/configuration.
+
 ## One-Shot Arrival Call Test
 
 If the car is already at the pickup location and you only want to test the arrival call flow, run:
