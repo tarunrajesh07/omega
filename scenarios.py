@@ -109,23 +109,47 @@ async def _reroute_request_from_frames(
     call_event_count = 0
     did_reroute_notice = False
     did_final_arrival = False
+    latest_scene: SceneDescription | None = None
+    did_initial_scene_check = False
     async for frame in frames:
         seen += 1
         state = _scenario_state(settings.scenario_state_file, settings.scenario_run_id)
         status = state.get("status") if state else None
 
         if status == "arrived" and call_event_count < settings.blocked_threshold and seen > settings.scenario_warmup_frames:
+            if vision is not None and not did_initial_scene_check:
+                latest_scene = await _safe_describe_pickup_scene(vision, frame)
+                did_initial_scene_check = True
+
+            if latest_scene is None or (latest_scene.raw.get("source") != "gemini" and not settings.allow_scripted_vlm_calls):
+                reason = "Arrived at pickup location, but waiting for a real Gemini pickup-scene description before calling."
+                if latest_scene:
+                    reason += f" Latest fallback scene: {latest_scene.summary}"
+                yield VisionEvent(
+                    event_type=EventType.EN_ROUTE,
+                    reason=reason,
+                    confidence=0.7,
+                    raw={"scenario": "reroute_request", "waiting_for_scene_description": True, "status": status},
+                )
+                continue
+
             call_event_count += 1
+            scene_text = _scene_call_text(latest_scene)
             yield VisionEvent(
                 event_type=EventType.BLOCKED,
                 reason=(
-                    f"Stopped at {settings.destination_label}. Call the passenger to say the vehicle has arrived. "
-                    f"If the passenger asks to reroute, the fixed demo reroute destination is {settings.reroute_destination_label}."
+                    f"Stopped at {settings.destination_label}. {scene_text}"
                 ),
                 confidence=0.99,
                 obstacle="waiting for passenger reroute request",
                 eta_minutes=2,
-                raw={"scenario": "reroute_request", "stop_status": status, "call_event_count": call_event_count},
+                raw={
+                    "scenario": "reroute_request",
+                    "stop_status": status,
+                    "call_event_count": call_event_count,
+                    "scene": latest_scene.raw,
+                    "used_real_vlm": latest_scene.raw.get("source") == "gemini",
+                },
             )
             continue
 

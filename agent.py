@@ -256,7 +256,7 @@ class RideAgent:
             return f"Your ride has arrived. {event.reason}"
         if event.event_type == EventType.BLOCKED:
             if event.raw.get("scenario") == "reroute_request":
-                return f"I've arrived at {self.settings.destination_label}. I'm waiting here now."
+                return f"I've arrived at {self.settings.destination_label}. {event.reason}"
             obstacle = event.obstacle or "an obstacle"
             return f"I'm blocked by {obstacle}. Estimated delay: {eta} minutes. Say wait, reroute, or cancel."
         if event.event_type == EventType.HAZARD:
